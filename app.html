@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智慧記帳 & 儲蓄管家</title>
+    
+    <!-- PWA Settings -->
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="智慧記帳">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2382/2382461.png">
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-color: #F3F4F6;
+            --card-bg: #FFFFFF;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
+            --income-color: #10B981;
+            --income-light: #ECFDF5;
+            --expense-color: #EF4444;
+            --expense-light: #FEF2F2;
+            --primary-blue: #3B82F6;
+            --border-radius: 16px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding-bottom: 40px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Header */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 4px;
+        }
+
+        .app-header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .month-picker {
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #E5E7EB;
+            background: var(--card-bg);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Balance Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .card-full {
+            grid-column: span 2;
+        }
+
+        .card-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-amount {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .amount-income { color: var(--income-color); }
+        .amount-expense { color: var(--expense-color); }
+        .amount-savings { color: var(--primary-blue); }
+
+        /* Savings Progress Bar */
+        .savings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background-color: #E5E7EB;
+            border-radius: 5px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3B82F6, #10B981);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* Form styling */
+        .type-toggle {
+            display: flex;
+            background-color: #F3F4F6;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 14px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn.active-expense {
+            background-color: var(--expense-color);
+            color: white;
+        }
+
+        .toggle-btn.active-income {
+            background-color: var(--income-color);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #E5E7EB;
+            font-size: 1rem;
+            outline: none;
+            background-color: #FAFAFA;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-blue);
+            background-color: #FFFFFF;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background-color: var(--primary-blue);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            transition: background 0.2s ease;
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Chart Section */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        .chart-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .chart-tab-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #E5E7EB;
+            background: transparent;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .chart-tab-btn.active {
+            background: var(--text-primary);
+            color: white;
+            border-color: var(--text-primary);
+        }
+
+        /* Transaction List */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .icon-expense {
+            background-color: var(--expense-light);
+            color: var(--expense-color);
+        }
+
+        .icon-income {
+            background-color: var(--income-light);
+            color: var(--income-color);
+        }
+
+        .item-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-category {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .item-note-date {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .item-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .item-amount {
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #9CA3AF;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 0.9rem;
+        }
+
+        .delete-btn:hover {
+            color: var(--expense-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Top Bar -->
+    <div class="app-header">
+        <h1><i class="fa-solid fa-wallet" style="color: var(--primary-blue)"></i> 記帳 & 儲蓄</h1>
+        <input type="month" id="monthPicker" class="month-picker">
+    </div>
+
+    <!-- Monthly Summary Cards -->
+    <div class="summary-grid">
+        <div class="card">
+            <div class="card-label"><i class="fa-solid fa-arrow-down-left amount-income"></i> 本月收入</div>
+            <div class="card-amount amount-income" id="totalIncome">$0</div>
+        </div>
+        <div class="card">
+            <div class="card-label"><i class="fa-solid fa-arrow-up-right amount-expense"></i> 本月支出</div>
+            <div class="card-amount amount-expense" id="totalExpense">$0</div>
+        </div>
+        <div class="card card-full">
+            <div class="card-label"><i class="fa-solid fa-piggy-bank amount-savings"></i> 本月淨儲蓄</div>
+            <div class="savings-header">
+                <span class="card-amount amount-savings" id="netSavings">$0</span>
+                <span style="font-size: 0.85rem; font-weight: 600;" id="savingsRateBadge">儲蓄率: 0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="savingsProgressBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="card">
+        <div class="chart-tabs">
+            <button class="chart-tab-btn active" onclick="switchChart('expense')">支出分類圓餅圖</button>
+            <button class="chart-tab-btn" onclick="switchChart('ratio')">收支儲蓄比</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="analyticsChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Transaction Form -->
+    <div class="card">
+        <div class="type-toggle">
+            <button type="button" class="toggle-btn active-expense" id="btnExpense" onclick="setTransactionType('expense')">🔴 支出</button>
+            <button type="button" class="toggle-btn" id="btnIncome" onclick="setTransactionType('income')">🟢 收入</button>
+        </div>
+        <form id="transactionForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="amount">金額 (NT$)</label>
+                    <input type="number" id="amount" class="form-control" placeholder="0" min="0" required inputmode="decimal">
+                </div>
+                <div class="form-group">
+                    <label for="category">類別</label>
+                    <select id="category" class="form-control" required></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="date">日期</label>
+                    <input type="date" id="date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="note">備註 (可填)</label>
+                    <input type="text" id="note" class="form-control" placeholder="如：午餐雞腿飯">
+                </div>
+            </div>
+            <button type="submit" class="submit-btn" id="submitBtn">新增支出</button>
+        </form>
+    </div>
+
+    <!-- Transaction History -->
+    <div>
+        <div class="section-header">
+            <span class="section-title">明細紀錄</span>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);" id="recordCount">共 0 筆</span>
+        </div>
+        <div class="transaction-list" id="transactionList">
+            <!-- Items injected by JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // App State & Predefined Categories
+    let currentType = 'expense';
+    let transactions = JSON.parse(localStorage.getItem('accounting_transactions')) || [];
+    let activeChartType = 'expense';
+    let analyticsChart = null;
+
+    const categories = {
+        expense: [
+            { name: '餐飲飲食', icon: 'fa-utensils' },
+            { name: '交通出行', icon: 'fa-bus' },
+            { name: '居住固定', icon: 'fa-house' },
+            { name: '日常用品', icon: 'fa-cart-shopping' },
+            { name: '休閒娛樂', icon: 'fa-gamepad' },
+            { name: '醫療保健', icon: 'fa-notes-medical' },
+            { name: '學習成長', icon: 'fa-book' },
+            { name: '社交人情', icon: 'fa-gift' },
+            { name: '其它雜項', icon: 'fa-ellipsis' }
+        ],
+        income: [
+            { name: '工作薪資', icon: 'fa-briefcase' },
+            { name: '獎金加給', icon: 'fa-sack-dollar' },
+            { name: '投資理財', icon: 'fa-chart-line' },
+            { name: '副業接案', icon: 'fa-laptop-code' },
+            { name: '其它收入', icon: 'fa-wallet' }
+        ]
+    };
+
+    // DOM Elements
+    const monthPicker = document.getElementById('monthPicker');
+    const categorySelect = document.getElementById('category');
+    const transactionForm = document.getElementById('transactionForm');
+    const transactionList = document.getElementById('transactionList');
+
+    // Initialize Page
+    window.onload = function() {
+        // Set default month to current YYYY-MM
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        monthPicker.value = `${year}-${month}`;
+        document.getElementById('date').value = today.toISOString().split('T')[0];
+
+        updateCategoryDropdown();
+        render();
+
+        monthPicker.addEventListener('change', render);
+        
+        // Register PWA Service Worker (Inline Blob Solution)
+        registerServiceWorker();
+    };
+
+    // Toggle Income / Expense Type
+    function setTransactionType(type) {
+        currentType = type;
+        const btnExpense = document.getElementById('btnExpense');
+        const btnIncome = document.getElementById('btnIncome');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (type === 'expense') {
+            btnExpense.className = 'toggle-btn active-expense';
+            btnIncome.className = 'toggle-btn';
+            submitBtn.textContent = '新增支出';
+            submitBtn.style.backgroundColor = 'var(--expense-color)';
+        } else {
+            btnExpense.className = 'toggle-btn';
+            btnIncome.className = 'toggle-btn active-income';
+            submitBtn.textContent = '新增收入';
+            submitBtn.style.backgroundColor = 'var(--income-color)';
+        }
+        updateCategoryDropdown();
+    }
+
+    function updateCategoryDropdown() {
+        categorySelect.innerHTML = '';
+        categories[currentType].forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat.name;
+            opt.textContent = cat.name;
+            categorySelect.appendChild(opt);
+        });
+    }
+
+    // Add New Transaction
+    transactionForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const amount = parseFloat(document.getElementById('amount').value);
+        const category = document.getElementById('category').value;
+        const date = document.getElementById('date').value;
+        const note = document.getElementById('note').value.trim();
+
+        if (!amount || amount <= 0 || !date) return;
+
+        const newRecord = {
+            id: Date.now(),
+            type: currentType,
+            amount: amount,
+            category: category,
+            date: date,
+            note: note
+        };
+
+        transactions.push(newRecord);
+        saveData();
+        render();
+
+        // Reset inputs
+        document.getElementById('amount').value = '';
+        document.getElementById('note').value = '';
+    });
+
+    // Delete Transaction
+    function deleteTransaction(id) {
+        transactions = transactions.filter(t => t.id !== id);
+        saveData();
+        render();
+    }
+
+    function saveData() {
+        localStorage.setItem('accounting_transactions', JSON.stringify(transactions));
+    }
+
+    // Main Render Pipeline
+    function render() {
+        const selectedMonth = monthPicker.value; // YYYY-MM
+        
+        // Filter by selected month
+        const filteredRecords = transactions.filter(t => t.date.startsWith(selectedMonth));
+        filteredRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Compute Financial Metrics
+        let income = 0;
+        let expense = 0;
+
+        filteredRecords.forEach(t => {
+            if (t.type === 'income') income += t.amount;
+            if (t.type === 'expense') expense += t.amount;
+        });
+
+        const netSavings = income - expense;
+        const savingsRate = income > 0 ? Math.max(0, Math.round((netSavings / income) * 100)) : 0;
+
+        // Update DOM Cards
+        document.getElementById('totalIncome').textContent = `$${income.toLocaleString()}`;
+        document.getElementById('totalExpense').textContent = `$${expense.toLocaleString()}`;
+        document.getElementById('netSavings').textContent = `$${netSavings.toLocaleString()}`;
+        document.getElementById('savingsRateBadge').textContent = `儲蓄率: ${savingsRate}%`;
+        document.getElementById('savingsProgressBar').style.width = `${Math.min(100, savingsRate)}%`;
+
+        // Render List
+        renderTransactionList(filteredRecords);
+
+        // Render Chart
+        renderChart(filteredRecords, income, expense, netSavings);
+    }
+
+    function renderTransactionList(records) {
+        transactionList.innerHTML = '';
+        document.getElementById('recordCount').textContent = `共 ${records.length} 筆`;
+
+        if (records.length === 0) {
+            transactionList.innerHTML = `<div class="empty-state">這個月還沒有任何記帳紀錄喔！</div>`;
+            return;
+        }
+
+        records.forEach(t => {
+            const isExpense = t.type === 'expense';
+            const catInfo = categories[t.type].find(c => c.name === t.category) || { icon: 'fa-tag' };
+            
+            const itemHtml = `
+                <div class="transaction-item">
+                    <div class="item-left">
+                        <div class="icon-box ${isExpense ? 'icon-expense' : 'icon-income'}">
+                            <i class="fa-solid ${catInfo.icon}"></i>
+                        </div>
+                        <div class="item-details">
+                            <div class="item-category">${t.category}</div>
+                            <div class="item-note-date">${t.date} ${t.note ? '• ' + t.note : ''}</div>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <div class="item-amount ${isExpense ? 'amount-expense' : 'amount-income'}">
+                            ${isExpense ? '-' : '+'}$${t.amount.toLocaleString()}
+                        </div>
+                        <button class="delete-btn" onclick="deleteTransaction(${t.id})">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            transactionList.insertAdjacentHTML('beforeend', itemHtml);
+        });
+    }
+
+    // Chart Switch Tab
+    function switchChart(type) {
+        activeChartType = type;
+        const btns = document.querySelectorAll('.chart-tab-btn');
+        btns[0].classList.toggle('active', type === 'expense');
+        btns[1].classList.toggle('active', type === 'ratio');
+        render();
+    }
+
+    function renderChart(records, totalIncome, totalExpense, netSavings) {
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        
+        if (analyticsChart) {
+            analyticsChart.destroy();
+        }
+
+        if (activeChartType === 'expense') {
+            // Aggregate Expense by Category
+            const expenseMap = {};
+            records.filter(r => r.type === 'expense').forEach(r => {
+                expenseMap[r.category] = (expenseMap[r.category] || 0) + r.amount;
+            });
+
+            const labels = Object.keys(expenseMap);
+            const data = Object.values(expenseMap);
+
+            if (data.length === 0) {
+                renderEmptyChart(ctx, "暫無支出數據");
+                return;
+            }
+
+            analyticsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#EF4444', '#F59E0B', '#10B981', '#3B82F6', 
+                            '#8B5CF6', '#EC4899', '#64748B', '#14B8A6'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        } else {
+            // Savings / Expense Ratio
+            const savingsVal = Math.max(0, netSavings);
+            
+            if (totalExpense === 0 && savingsVal === 0) {
+                renderEmptyChart(ctx, "暫無收支數據");
+                return;
+            }
+
+            analyticsChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['總支出', '淨儲蓄'],
+                    datasets: [{
+                        data: [totalExpense, savingsVal],
+                        backgroundColor: ['#EF4444', '#10B981'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+    }
+
+    function renderEmptyChart(ctx, message) {
+        analyticsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [message],
+                datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // PWA Service Worker Inline Registration
+    function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE_NAME = 'accounting-app-v1';
+                self.addEventListener('install', e => {
+                    e.waitUntil(
+                        caches.open(CACHE_NAME).then(cache => cache.addAll(['./']))
+                    );
+                });
+                self.addEventListener('fetch', e => {
+                    e.respondWith(
+                        caches.match(e.request).then(response => response || fetch(e.request))
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration error:', err));
+        }
+    }
+</script>
+
+</body>
+</html>
